@@ -43,13 +43,19 @@ export GPX_RELEASE_NOTES="First release."
 xvfb-run -a node scripts/publish.js
 ```
 
-Generate compliant assets with:
+Generate compliant assets with FREE AI (no account, no API key — FLUX via anonymous HF Spaces API):
 
 ```bash
 pip install pillow
-python3 scripts/make_assets.py --title "MY GAME" --out-dir .
-# -> icon_256.png (256x256) + cover_1360x850.png (1360x850)
+python3 scripts/gen_assets.py \
+  --prompt "a cartoon moving truck loaded with cardboard boxes driving up a sunny \
+hilly road toward a new house, vibrant colors, clean vector style" \
+  --out-dir ./assets
+# -> assets/icon_256.png (256x256, <=1MB) + assets/cover_1360x850.png (1360x850, <=1.5MB)
 ```
+
+- `--prompt` = visual description of the game only; **assets carry no text/name/logo** (a ban-suffix is appended automatically).
+- If the anonymous GPU quota is busy, the script retries with backoff across two FLUX Spaces, optionally uses `HF_TOKEN` (free account), and finally falls back to PIL-drawn assets so publishing never blocks.
 
 ## What the script verifies
 
@@ -63,7 +69,8 @@ python3 scripts/make_assets.py --title "MY GAME" --out-dir .
 
 - `SKILL.md` — the actual skill (platform knowledge + step-by-step)
 - `scripts/publish.js` — one-shot end-to-end publisher
-- `scripts/make_assets.py` — compliant icon/cover generator (PIL)
+- `scripts/gen_assets.py` — FREE AI asset generator (FLUX via anonymous HF Spaces API, text-free, GamePix-compliant)
+- `scripts/make_assets.py` — offline PIL fallback (also text-free)
 
 ## Disclaimer
 

@@ -79,7 +79,7 @@ SDK error strings: `GAMEPIX_LOADED_NOT_CALLED`, `LOADED_ALREADY_CALLED`, `UPDATE
 - ZIP zipped at FILE level: `index.html` at archive root (not inside a folder). Accepts `.zip` (or `.gpx` from the Unity plugin).
 - All resources relative paths; no external links/analytics/ads/third-party SDKs; no `alert`/`confirm`; no "Rotate device" prompt; no quit button; no religious/explicit content.
 - Pause game AND audio during ads and on `visibilitychange`; iframe-friendly at 640×480; `<meta name="viewport" content="...user-scalable=NO...">`; `touch-action:none` on body.
-- Assets: icon **256×256** (≤1MB), cover **1360×850** (≤1.5MB), JPG/PNG, representative of the game, title text on assets must match game title.
+- Assets: icon **256×256** (≤1MB), cover **1360×850** (≤1.5MB), JPG/PNG, representative of the game, and **NO text/names/logos on assets** — generate them with AI (`scripts/gen_assets.py`).
 - Description 100–500 chars, unique, no AI boilerplate; how-to-play ≤500 chars (controls first, Desktop/Mobile sections).
 - Keep the build small. One ad at a time, between levels only, never timer-based.
 
@@ -90,7 +90,7 @@ Full working implementation: `scripts/publish.js` (this repo). Usage:
 ```bash
 GPX_EMAIL=you@example.com GPX_PASSWORD='secret' GPX_TITLE="My Game" \
 GPX_MAIN_TAG="puzzle" GPX_DESCRIPTION="100-500 char original description..." \
-GPX_HOW_TO_PLAY="Desktop\n... Mobile\n..." GPX_ICON=icon.png GPX_COVER=cover.png \
+GPX_HOW_TO_PLAY="Desktop\n... Mobile\n..." GPX_ICON=assets/icon_256.png GPX_COVER=assets/cover_1360x850.png \
 GPX_ZIP=game-v1.0.0.zip GPX_RELEASE_NOTES="First release." \
 xvfb-run -a node scripts/publish.js
 ```
@@ -115,9 +115,36 @@ The script performs, in order (each step verified by an API 200 or DOM state):
 - If a session expires mid-flow, the page redirects to `/login`; re-login (credentials typed with pressSequentially) then `goto` the target URL again.
 - Never `page.evaluate(window.open=...)`-patch or JS-click Ionic components; trusted clicks only.
 
-## 5. Creating assets programmatically (PIL)
+## 5. Creating assets with FREE AI generation (preferred)
 
-See `scripts/make_assets.py` — draws a decent icon (256×256) and 16:9 cover (1360×850) with flat shapes + title text; keep both < 1MB (PNG optimize=True). Ensure the in-asset title matches the game title (review rule).
+Use `scripts/gen_assets.py` — generates the icon and cover with **FLUX (Hugging Face Spaces anonymous Gradio API)**: no account, no API key. Validated Sept 2026.
+
+```bash
+pip install pillow
+python3 scripts/gen_assets.py \
+  --prompt "a cartoon moving truck loaded with cardboard boxes driving up a sunny \
+hilly road toward a new house, vibrant colors, clean vector style" \
+  --out-dir ./assets
+# -> assets/icon_256.png (256x256, <=1MB) + assets/cover_1360x850.png (1360x850, <=1.5MB)
+```
+
+How it works / rules:
+- `--prompt` is a **VISUAL description of the game only**. NEVER ask the model to render the game title or any words.
+- The script appends a ban-suffix to every prompt: "no text, no letters, no words, no numbers, no logo, no watermark..." — **assets must carry no name/branding**.
+- Icon is generated at 1024×1024 then downscaled to exactly 256×256 (cover-crop, LANCZOS). Cover is generated at 1360×850 directly. If a PNG exceeds the byte limit it is re-encoded as JPEG (also accepted).
+- Spaces tried in order: `black-forest-labs/FLUX.1-schnell` (fast), then `black-forest-labs/FLUX.1-dev`. Anonymous ZeroGPU quota is **per-IP and rolling**: on failure the script waits (exponential backoff, default 4 rounds × 20-60s) and retries. Optional `HF_TOKEN` env var (free account token) raises the quota.
+- If ALL AI attempts fail, it falls back to `scripts/make_assets.py` (PIL-drawn, also text-free) so publishing never blocks.
+
+Manual one-off generation (any size) with the same API, in Python stdlib only:
+
+```python
+# POST https://black-forest-labs-flux-1-schnell.hf.space/gradio_api/call/infer
+#   {"data": [prompt, seed, randomize_seed, width, height, 4]}   -> {"event_id": ...}
+# GET  .../gradio_api/call/infer/<event_id>                        -> SSE stream
+# "event: complete\ndata: [{"url": "https://.../image.webp"}, seed] -> download the url
+```
+
+Fallback (offline): `scripts/make_assets.py --title "MY GAME"` draws PIL assets — pass `--title ""`-equivalent (`None`) to keep them text-free.
 
 ## 6. What "done" looks like
 
