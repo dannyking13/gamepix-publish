@@ -1,0 +1,12 @@
+{
+  "name": "gamepix-publish",
+  "version": "1.0.0",
+  "description": "AI-agent skill: integrate GamePix SDK and publish any HTML5 game end-to-end on my.gamepix.com",
+  "private": true,
+  "scripts": {
+    "publish": "node scripts/publish.js"
+  },
+  "dependencies": {
+    "playwright": "^1.63.0"
+  }
+}
