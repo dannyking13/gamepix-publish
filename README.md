@@ -71,8 +71,14 @@ hilly road toward a new house, vibrant colors, clean vector style" \
 
 - `SKILL.md` — the actual skill (platform knowledge + step-by-step)
 - `scripts/publish.js` — one-shot end-to-end publisher
+- `scripts/bridges/poki_bridge.js` — AD BRIDGE: PokiSDK games get REAL GamePix ads (commercialBreak→interstitialAd, rewardedBreak→rewardAd, happyTime→happyMoment)
+- `scripts/bridges/snacks_bridge.js` — AD BRIDGE: GameSnacks games get REAL GamePix ads (ad.break next/reward→interstitial/reward, score.update→updateScore, levelComplete→updateLevel+happyMoment, game.ready→loaded)
 - `scripts/gen_assets.py` — FREE AI asset generator (FLUX via anonymous HF Spaces API, text-free, GamePix-compliant)
 - `scripts/make_assets.py` — offline PIL fallback (also text-free)
+
+## REVIEW LOCK (important)
+
+Once a game is submitted, the build is **server-locked** until QA answers: `build-signed-url` returns 401 "Unauthorized game state" while in review, status cannot be flipped back to edit, and there is no withdraw/delete. Therefore ALWAYS integrate the SDK **and the ad bridge** (and score/level events) BEFORE the first submission. See SKILL.md §7 for the full evidence and `--upload` watcher pattern for auto-upgrading builds when QA unlocks a game.
 
 ## Disclaimer
 

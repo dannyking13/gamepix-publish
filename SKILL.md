@@ -52,6 +52,27 @@ Insert as the FIRST script in `<head>` of `index.html`:
 </head>
 ```
 
+### 2a. Games coming from Poki or GameSnacks: install the AD BRIDGE (ads are the priority!)
+
+Most portal games call their platform SDK for ads (`PokiSDK.commercialBreak()`, `GameSnacks.ad.break(...)`) and lifecycle events. If you strip that SDK, ads silently stop working. **Never ship a no-op driver** — use the validated bridges in `scripts/bridges/` (load as the FIRST script, before any game script):
+
+| Game calls | Bridge | Real GamePix call |
+|---|---|---|
+| `PokiSDK.commercialBreak()` | `bridges/poki_bridge.js` | `GamePix.interstitialAd()` |
+| `PokiSDK.rewardedBreak()` | `bridges/poki_bridge.js` | `GamePix.rewardAd()` |
+| `PokiSDK.happyTime()` | `bridges/poki_bridge.js` | `GamePix.happyMoment()` |
+| `PokiSDK.gameLoadingProgress/Finished()` | `bridges/poki_bridge.js` | `GamePix.loading()/loaded()` |
+| `GameSnacks.ad.break({type:"next"})` | `bridges/snacks_bridge.js` | `GamePix.interstitialAd()` |
+| `GameSnacks.ad.break({type:"reward"})` | `bridges/snacks_bridge.js` | `GamePix.rewardAd()` (full beforeAd→beforeReward→showAdFn→adViewed→afterAd→adBreakDone flow) |
+| `GameSnacks.score.update(n)` / `game.levelComplete(n)` | `bridges/snacks_bridge.js` | `GamePix.updateScore(n)` / `updateLevel(n)+happyMoment()+interstitial` |
+| `GameSnacks.game.ready()` | `bridges/snacks_bridge.js` | `GamePix.loaded()` |
+
+Both bridges keep the original game surface intact (the game never knows), pause-safety is preserved (the game already pauses during its own ad-break flow), and each call is protected by a hard timeout so gameplay can never freeze if an ad fails.
+
+Wiring is proven: a Playwright spy test confirmed every bridge call lands on the real GamePix method (`commercialBreak→interstitialAd()`, `ad.break(reward)→rewardAd()`, `score.update(9)→updateScore(9)`, `levelComplete(2)→updateLevel(2)+happyMoment()+interstitialAd()`).
+
+**Do this BEFORE the first submission** — while a game is in review the build is LOCKED (see §7).
+
 API (all optional except noted; errors are logged, never throw):
 
 | Method | When to call |
@@ -151,6 +172,23 @@ Fallback (offline): `scripts/make_assets.py --title "MY GAME"` draws PIL assets 
 - Games list shows the game with status badge **REVIEW** (was **EDIT**).
 - Draft API: `status:"review"`, `buildStatus:"ready"`, `buildMessage:"The build is reviewable"`.
 - Notify the user: game submitted, QA typically takes a few days; edits are locked while in review (status switches to EDIT again if changes are requested).
+
+## 7. REVIEW LOCK — build updates are impossible while in review (server-enforced)
+
+Validated exhaustively (Sept 2026). Once a game is submitted for review (`status:"review"`):
+
+- The Build tab hides Browse and disables Upload — **client-side only**. Bypassing the DOM does NOT help:
+  - `GET /v3/devs/game-drafts/build-signed-url/<ns>?fileType=zip` → **401 `"Unauthorized game state."`** (server refuses while in review; the SAME call returns 200 for games never submitted).
+- `PUT /v3/devs/game-drafts/<ns>` with `{status:"edit"}` → **400** `must NOT have additional properties: status` (status is not editable).
+- There is **no withdraw/cancel-review/delete** feature anywhere (UI, bundles, API).
+- Release notes textarea becomes `readonly`; asset inputs are also locked in review.
+- The build download endpoint requires AWS SigV4 signing you cannot produce (`403 Authorization header requires 'Credential' parameter...`).
+
+**Consequences — how to plan correctly:**
+1. Finish EVERYTHING (SDK + ads bridge + score/level events + compliant build) BEFORE clicking Submit for review. The first submitted build should be the one you want QA to see.
+2. If the QA requests changes, the game returns to EDIT and builds unlock again — that is the supported way to update.
+3. Do not submit placeholder builds "just to test" — you burn the review slot with a build you can no longer replace.
+4. Auth for direct API calls: the dashboard sends a **JWT `Authorization: Bearer ey...` header** (capture it via `page.on('request')`); cookies alone give 401.
 
 ## References
 - SDK doc: https://partners.gamepix.com/sdk/doc/javascript (per-engine docs: /cocos, /construct2, /construct3, /gdevelop-5, /godot-plugin, /unity-plugin)
