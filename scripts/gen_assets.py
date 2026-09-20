@@ -8,7 +8,9 @@ Spaces tried in order (anonymous quota is per-IP and rolling — retry/backoff m
   1. black-forest-labs/FLUX.1-schnell   (fast, 4 steps)
   2. black-forest-labs/FLUX.1-dev       (slower, 28 steps)
 
-Optional: set HF_TOKEN (free account token) to raise ZeroGPU anonymous quota.
+Optional: set HF_TOKEN (env var) or put a free-account token in scripts/.hf_token
+(git-ignored) to raise ZeroGPU anonymous quota. Get one free at
+https://huggingface.co/settings/tokens (role: read is enough).
 
 Outputs (in --out-dir):
   icon_256.png         256x256, <=1MB    (generated at 1024x1024, downscaled)
@@ -36,7 +38,31 @@ import time
 import urllib.request
 import urllib.error
 
-TOKEN = os.environ.get("HF_TOKEN", "").strip()
+
+def _load_token() -> str:
+    """HF token (raises ZeroGPU anonymous quota; free account, no payment needed).
+
+    Sources, in order: HF_TOKEN env var, then a git-ignored scripts/.hf_token file
+    containing just the token (never commit the raw token to a public repo —
+    Hugging Face secret-scanning auto-revokes leaked tokens).
+    """
+    tok = os.environ.get("HF_TOKEN", "").strip()
+    if tok:
+        return tok
+    here = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".hf_token")
+    for p in (here, os.path.expanduser("~/.hf_token")):
+        try:
+            if os.path.isfile(p):
+                with open(p) as f:
+                    tok = f.read().strip()
+                if tok:
+                    return tok
+        except OSError:
+            pass
+    return ""
+
+
+TOKEN = _load_token()
 
 SPACES = [
     {

@@ -7,6 +7,10 @@
 - Game edit: https://my.gamepix.com/games/<namespace>
 - APIs: https://api.gamepix.com/v3/devs/* , https://api.partner.gamepix.com/*
 
+## Free AI asset generation (gen_assets.py)
+- FLUX via anonymous Gradio API of HF Spaces: POST `https://black-forest-labs-flux-1-schnell.hf.space/gradio_api/call/infer` {"data":[prompt,seed,rand,w,h,steps]} → event_id → SSE → image URL. Fallback space: FLUX.1-dev (data has guidance before steps).
+- Anonymous ZeroGPU quota is per-IP rolling: `data: null` / "generation error: null" = quota — retry with backoff (script does 4 rounds × 20-60s) or use HF_TOKEN / scripts/.hf_token (git-ignored) to raise it.
+
 ## Login (Angular + Ionic)
 - Form: `form#login-form`
 - Email: `ion-input[name="email"] input.native-input`
@@ -26,7 +30,7 @@
 
 ### Info tab
 - Title: `ion-input[name="title"] input.native-input`
-- Main tag + extra tags: `.ionic-selectable` (first = main) → modal `.ionic-selectable-item` list
+- Main tag + extra tags: `.ionic-selectable` (first = main, single-select; second = extra/secondary tags, MULTI-select — stays open after item clicks, confirm with footer OK/Save/Done button). Secondary tags are REQUIRED by the publish.js workflow (GPX_EXTRA_TAGS env var).
 - Orientation: `ion-select[name="orientation"]` → `ion-popover ion-item` (All | Landscape | Portrait)
 - Checkboxes: `ion-checkbox[name="allowDistribution|desktopFriendly|mobileFriendly|sdkIntegration"]`
 - Game engine: `ion-select[name="gameEngine"]` → popover items: HTML5-JS, Unity/WebGL, Phaser, Construct 2, Construct 3, GameMaker, Cocos, GDevelop, Godot, Unity(.gpx), ...

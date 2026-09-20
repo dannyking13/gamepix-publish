@@ -28,7 +28,8 @@ The skill instructions (`SKILL.md`) contain the full platform knowledge: Cloudfl
 export GPX_EMAIL=you@example.com
 export GPX_PASSWORD='secret'
 export GPX_TITLE="My Game"
-export GPX_MAIN_TAG="puzzle"            # puzzle, arcade, racing, ...
+export GPX_MAIN_TAG="puzzle"            # main tag (puzzle, arcade, racing, ...)
+export GPX_EXTRA_TAGS="driving,simulation"  # secondary tags — REQUIRED by this workflow
 export GPX_DESCRIPTION="Original 100-500 char description of the game..."
 export GPX_HOW_TO_PLAY="Desktop
 Arrows = Move
@@ -56,6 +57,7 @@ hilly road toward a new house, vibrant colors, clean vector style" \
 
 - `--prompt` = visual description of the game only; **assets carry no text/name/logo** (a ban-suffix is appended automatically).
 - If the anonymous GPU quota is busy, the script retries with backoff across two FLUX Spaces, optionally uses `HF_TOKEN` (free account), and finally falls back to PIL-drawn assets so publishing never blocks.
+- To raise the anonymous quota, set `HF_TOKEN=<your free token>` or put the token in a git-ignored `scripts/.hf_token` file (never commit a raw token to a public repo — HF auto-revokes leaked tokens).
 
 ## What the script verifies
 

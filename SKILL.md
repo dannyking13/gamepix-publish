@@ -36,7 +36,7 @@ Everything below was validated in a real end-to-end run (game created, assets up
 - **Always use real Playwright clicks** (`locator.click()`) — they pierce shadow DOM and are trusted events. `el.click()` via `page.evaluate` silently fails on Ionic/Angular components (state doesn't update, Save stays disabled).
 - Text inputs: click the native `input` inside `ion-input`/`ion-textarea` and `pressSequentially`.
 - `ion-select` opens an `ion-popover`; pick an option with a real click on `ion-popover ion-item` (hasText), then the popover closes itself.
-- `ionic-selectable` (tag pickers): real click on `.ionic-selectable` opens a modal list of `.ionic-selectable-item`s; real click on the desired item closes it.
+- `ionic-selectable` (tag pickers): real click on `.ionic-selectable` opens a modal list of `.ionic-selectable-item`s; real click on the desired item closes it. There are TWO pickers on the Info tab: **first = Main tag (single), second = Extra/secondary tags (multi-select)** — the second one stays open after clicking items; confirm with the modal footer button (OK/Save/Done). `publish.js` automates this via `GPX_EXTRA_TAGS` (comma-separated).
 - `ion-checkbox`: real click toggles (verify via `classList.contains('checkbox-checked')`).
 - An `ion-loading` overlay can block clicks: `await page.locator('ion-loading').first().waitFor({ state: 'hidden', timeout: 10000 })` before clicking tabs.
 - A cookie/payment modal may appear on the games page: click `OK` / `Accept all` if visible before anything else.
@@ -89,7 +89,7 @@ Full working implementation: `scripts/publish.js` (this repo). Usage:
 
 ```bash
 GPX_EMAIL=you@example.com GPX_PASSWORD='secret' GPX_TITLE="My Game" \
-GPX_MAIN_TAG="puzzle" GPX_DESCRIPTION="100-500 char original description..." \
+GPX_MAIN_TAG="puzzle" GPX_EXTRA_TAGS="driving,simulation" GPX_DESCRIPTION="100-500 char original description..." \
 GPX_HOW_TO_PLAY="Desktop\n... Mobile\n..." GPX_ICON=assets/icon_256.png GPX_COVER=assets/cover_1360x850.png \
 GPX_ZIP=game-v1.0.0.zip GPX_RELEASE_NOTES="First release." \
 xvfb-run -a node scripts/publish.js
@@ -99,7 +99,7 @@ The script performs, in order (each step verified by an API 200 or DOM state):
 1. Login (re-login if redirected to /login; saves storageState to reuse the session).
 2. Games page → dismiss payment modal if present.
 3. **Create New Game** modal: title, main tag (ionic-selectable → item matching the tag name), description (100–500 chars) → `Create` → game appears in list (namespace = slugified title).
-4. Open `games/<ns>`; **Info tab**: fix main tag if needed, Orientation (`ion-select[name=orientation]` → Landscape), Desktop/Mobile friendly checkboxes, Game engine (`ion-select[name=gameEngine]` → Cocos/HTML5-JS/...), SDK integration checkbox → `Save` → wait for "Successfully updated!" toast and the warning "Please set Game Orientation" to disappear.
+4. Open `games/<ns>`; **Info tab**: fix main tag if needed, **ALSO pick the extra/secondary tags** (2nd `.ionic-selectable`, multi-select — REQUIRED by this workflow, e.g. 2-4 tags matching the genre; other optional fields can stay empty), Orientation (`ion-select[name=orientation]` → Landscape), Desktop/Mobile friendly checkboxes, Game engine (`ion-select[name=gameEngine]` → Cocos/HTML5-JS/...), SDK integration checkbox → `Save` → wait for "Successfully updated!" toast and the warning "Please set Game Orientation" to disappear.
 5. **Assets tab**: real-click the two `Add` buttons + `waitForEvent('filechooser')` → setFiles(icon/cover) → expect `POST .../upload/asset` 200 twice; tab text becomes "Assets: icon, cover" with "Modify" buttons.
 6. **Editorial tab**: fill `textarea[name=howToPlay]` (≤500 chars) → click enabled `Save` (PUT 200).
 7. **Build tab**: click `Browse File` + filechooser → setFiles(zip) → click enabled `Upload` → S3 PUT 200 → poll until "Build ready, your new version code is: <code>" (processing may take minutes; reload the tab while polling).

@@ -6,6 +6,7 @@
  *   GPX_EMAIL, GPX_PASSWORD        (required) dashboard credentials
  *   GPX_TITLE                      (required for new games)
  *   GPX_MAIN_TAG                   (required for new games) e.g. "puzzle", "arcade", "racing"
+ *   GPX_EXTRA_TAGS                 (recommended) comma-separated secondary tags, e.g. "driving,simulation"
  *   GPX_DESCRIPTION                (required for new games) 100-500 chars, original text
  *   GPX_HOW_TO_PLAY                (optional, recommended) <=500 chars, controls first
  *   GPX_ORIENTATION                (optional) Landscape|Portrait|All (default Landscape)
@@ -26,6 +27,7 @@ const CFG = {
   password: process.env.GPX_PASSWORD,
   title: process.env.GPX_TITLE,
   mainTag: process.env.GPX_MAIN_TAG || 'puzzle',
+  extraTags: (process.env.GPX_EXTRA_TAGS || '').split(',').map(s => s.trim()).filter(Boolean),
   description: process.env.GPX_DESCRIPTION,
   howToPlay: process.env.GPX_HOW_TO_PLAY || '',
   orientation: process.env.GPX_ORIENTATION || 'Landscape',
@@ -168,6 +170,37 @@ async function main() {
       const t = (await items.nth(i).textContent() || '').trim();
       if (new RegExp('^' + CFG.mainTag + '( games)?$', 'i').test(t)) { await items.nth(i).click(); break; }
     }
+    await page.waitForTimeout(2000);
+  }
+
+  // 2a-bis. EXTRA/secondary tags (2nd ionic-selectable, multi-select) — REQUIRED by workflow
+  // (main tag alone is not enough; other optional Info fields can stay empty)
+  const extraNow = await page.evaluate(() => {
+    const all = document.querySelectorAll('.ionic-selectable');
+    const s = all[1]; // [0] = main tag, [1] = extra tags
+    return s ? s.textContent.trim().slice(0, 60) : null;
+  });
+  if (CFG.extraTags.length && (!extraNow || extraNow.length < 2 || /^select/i.test(extraNow))) {
+    await page.locator('.ionic-selectable').nth(1).click();
+    await page.waitForTimeout(2500);
+    const items = page.locator('.ionic-selectable-item');
+    const n = await items.count();
+    for (const tag of CFG.extraTags) {
+      let picked = false;
+      for (let i = 0; i < n; i++) {
+        const t = (await items.nth(i).textContent() || '').trim();
+        if (new RegExp('^' + tag + '( games)?$', 'i').test(t)) {
+          await items.nth(i).click(); picked = true; await page.waitForTimeout(600); break;
+        }
+      }
+      if (!picked) log('WARN extra tag not found in list:', tag);
+    }
+    // confirm the multi-select modal (ionic-selectable footer button)
+    await page.evaluate(() => {
+      const btns = Array.from(document.querySelectorAll('ion-button, button'));
+      const b = btns.filter((x) => /^(ok|save|select|done|apply)$/i.test((x.textContent || '').trim())).pop();
+      if (b && !b.hasAttribute('disabled')) b.click();
+    });
     await page.waitForTimeout(2000);
   }
 
