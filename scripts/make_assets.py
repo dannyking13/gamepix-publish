@@ -96,5 +96,10 @@ if __name__ == '__main__':
     cover = os.path.join(args.out_dir, 'cover_1360x850.png')
     make_icon(args.title, icon)
     make_cover(args.title, cover)
+    # Provenance marker: these are PIL drawings, NOT AI-generated.
+    # publish.js refuses to submit a game with such assets (hard rule).
+    with open(os.path.join(args.out_dir, 'ASSETS_SOURCE'), 'w') as f:
+        f.write('assets_pil_fallback\n')
     print('icon bytes:', os.path.getsize(icon), '->', icon)
     print('cover bytes:', os.path.getsize(cover), '->', cover)
+    print('ASSETS_SOURCE=assets_pil_fallback written (never submit these)')

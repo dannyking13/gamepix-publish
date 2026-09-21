@@ -22,7 +22,9 @@ Rules enforced:
   - Exact GamePix dimensions + byte limits (icon <=1MB, cover <=1.5MB); if a PNG
     exceeds the limit it is re-encoded as JPEG (also accepted by GamePix).
   - If all AI attempts fail (space down, quota exhausted, network), falls back to the
-    PIL-drawn text-free assets from make_assets.py so publishing never blocks.
+    PIL-drawn text-free assets from make_assets.py, and writes ASSETS_SOURCE=assets_pil_fallback.
+    NON-AI (fallback) assets must NEVER be submitted for review — publish.js enforces this:
+    complete everything else, but do NOT click Submit; ask for real AI assets instead.
 
 Usage:
   pip install pillow   # only for post-processing + fallback
@@ -92,6 +94,17 @@ COVER_PROMPT = ("wide landscape game cover art: {p}, dynamic full scene, detaile
 
 ICON_MAX = 1 * 1024 * 1024      # 1MB
 COVER_MAX = 1536 * 1024         # 1.5MB
+
+# Provenance marker written next to the assets (publish.js refuses to submit on the PIL value).
+AI_MARKER = "ASSETS_SOURCE"
+ASSET_SOURCE_AI = "assets_ai_generated"     # real FLUX output — safe to submit
+ASSET_SOURCE_PIL = "assets_pil_fallback"    # PIL placeholder — NEVER submit
+
+
+def write_source_marker(out_dir: str, ai: bool) -> None:
+    """Persist whether assets are AI-generated or the PIL fallback."""
+    with open(os.path.join(out_dir, AI_MARKER), "w") as f:
+        f.write((ASSET_SOURCE_AI if ai else ASSET_SOURCE_PIL) + "\n")
 
 
 def _headers(extra: dict | None = None) -> dict:
@@ -209,6 +222,7 @@ def main() -> None:
     cover_p = COVER_PROMPT.format(p=args.prompt, n=NO_TEXT)
     tmp = os.path.join(args.out_dir, ".gen_tmp")
 
+    ai_ok = False
     try:
         print("[1/4] Generating icon (1024x1024)...")
         url = gen_image(icon_p, 1024, 1024, args.seed, args.retries)
@@ -219,6 +233,7 @@ def main() -> None:
         url = gen_image(cover_p, 1360, 850, args.seed + 100, args.retries)
         download(url, tmp)
         cover = fit(tmp, os.path.join(args.out_dir, "cover_1360x850.png"), 1360, 850, COVER_MAX)
+        ai_ok = True
     except Exception as e:  # noqa: BLE001
         if args.no_fallback:
             print(f"❌ {e}", file=sys.stderr)
@@ -229,9 +244,15 @@ def main() -> None:
         if os.path.exists(tmp):
             os.remove(tmp)
 
+    write_source_marker(args.out_dir, ai_ok)
     print(f"[3/4] icon  : {icon}  ({os.path.getsize(icon)} bytes, 256x256)")
     print(f"[4/4] cover : {cover}  ({os.path.getsize(cover)} bytes, 1360x850)")
-    print("✅ Done — assets are text-free and GamePix-compliant.")
+    if ai_ok:
+        print("✅ Done — AI-generated, text-free, GamePix-compliant (ASSETS_SOURCE=assets_ai_generated).")
+    else:
+        print("⚠️  Done, but these are PIL FALLBACK assets (ASSETS_SOURCE=assets_pil_fallback).")
+        print("⚠️  NEVER submit a game with fallback assets: complete every other publish step, then")
+        print("⚠️  regenerate with real AI (retry later / other IP / HF_TOKEN) before Submit for review.")
 
 
 if __name__ == "__main__":
