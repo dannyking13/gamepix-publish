@@ -154,6 +154,26 @@ def download(url: str, out: str) -> None:
         f.write(r.read())
 
 
+def pollinations_image(prompt: str, width: int, height: int, seed: int, out: str) -> str:
+    """Keyless FLUX endpoint (pollinations.ai) — backup AI provider when the
+    HF Spaces GPU quota is exhausted. Still REAL AI output (assets_ai_generated)."""
+    from urllib.parse import quote
+    from PIL import Image
+    import io
+    url = (f"https://image.pollinations.ai/prompt/{quote(prompt, safe='')}"
+           f"?width={width}&height={height}&seed={seed}&model=flux&nologo=true")
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+    with urllib.request.urlopen(req, timeout=300) as r:
+        data = r.read()
+    img = Image.open(io.BytesIO(data))
+    img.verify()
+    if len(data) < 4096:
+        raise RuntimeError("pollinations returned a suspiciously small image")
+    with open(out, "wb") as f:
+        f.write(data)
+    return out
+
+
 def gen_image(prompt: str, width: int, height: int, seed: int,
               retries: int = 4, backoff: int = 20) -> str:
     """Try every space, with exponential backoff (anonymous GPU quota is rolling)."""
@@ -225,13 +245,21 @@ def main() -> None:
     ai_ok = False
     try:
         print("[1/4] Generating icon (1024x1024)...")
-        url = gen_image(icon_p, 1024, 1024, args.seed, args.retries)
-        download(url, tmp)
+        try:
+            url = gen_image(icon_p, 1024, 1024, args.seed, args.retries)
+            download(url, tmp)
+        except Exception as hf_err:  # noqa: BLE001
+            print(f"  HF Spaces unavailable ({hf_err}) — trying Pollinations (FLUX, keyless)...")
+            pollinations_image(icon_p, 1024, 1024, args.seed, tmp)
         icon = fit(tmp, os.path.join(args.out_dir, "icon_256.png"), 256, 256, ICON_MAX)
 
         print("[2/4] Generating cover (1360x850)...")
-        url = gen_image(cover_p, 1360, 850, args.seed + 100, args.retries)
-        download(url, tmp)
+        try:
+            url = gen_image(cover_p, 1360, 850, args.seed + 100, args.retries)
+            download(url, tmp)
+        except Exception as hf_err:  # noqa: BLE001
+            print(f"  HF Spaces unavailable ({hf_err}) — trying Pollinations (FLUX, keyless)...")
+            pollinations_image(cover_p, 1360, 850, args.seed + 100, tmp)
         cover = fit(tmp, os.path.join(args.out_dir, "cover_1360x850.png"), 1360, 850, COVER_MAX)
         ai_ok = True
     except Exception as e:  # noqa: BLE001

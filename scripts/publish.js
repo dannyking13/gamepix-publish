@@ -39,6 +39,33 @@ const CFG = {
   sessionFile: process.env.GPX_SESSION_FILE || path.join(__dirname, '.gpx_session.json'),
 };
 
+// ---------- SELECT-POPOVER HELPERS ----------------------------------------
+// ion-select popovers that stay open block every later click — always dismiss.
+async function dismissPopover(page) {
+  try {
+    const vis = await page.locator('ion-popover .popover-viewport').first().isVisible();
+    if (vis) {
+      log('select popover still open — dismissing (Escape)');
+      await page.keyboard.press('Escape');
+      await page.waitForTimeout(1200);
+    }
+  } catch (e) { /* no popover at all */ }
+}
+
+// pick an option in the currently open popover: exact match first, then word-prefix
+async function pickOption(page, value) {
+  const opts = page.locator('ion-popover ion-item');
+  const on = await opts.count();
+  const texts = [];
+  for (let i = 0; i < on; i++) texts.push(((await opts.nth(i).textContent()) || '').trim());
+  for (const pass of [new RegExp('^' + value + '$', 'i'), new RegExp('^' + value + '\\b', 'i')]) {
+    for (let i = 0; i < on; i++) {
+      if (pass.test(texts[i])) { await opts.nth(i).click(); await page.waitForTimeout(1800); return true; }
+    }
+  }
+  return false;
+}
+
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36';
 const log = (...a) => console.log('[GPX]', ...a);
 const slugify = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
@@ -283,13 +310,10 @@ async function main() {
   if (needOrient) {
     await page.locator('ion-select[name="orientation"]').click();
     await page.waitForTimeout(2200);
-    const opts = page.locator('ion-popover ion-item');
-    const on = await opts.count();
-    for (let i = 0; i < on; i++) {
-      const t = (await opts.nth(i).textContent() || '').trim();
-      if (new RegExp('^' + CFG.orientation + '$', 'i').test(t)) { await opts.nth(i).click(); break; }
-    }
-    await page.waitForTimeout(2000);
+    const picked = await pickOption(page, CFG.orientation);
+    if (!picked) log('WARN: orientation option not found: ' + CFG.orientation);
+    await dismissPopover(page);
+    await page.waitForTimeout(800);
   }
 
   // 2c. desktop/mobile friendly
@@ -309,13 +333,10 @@ async function main() {
   if (needEngine) {
     await page.locator('ion-select[name="gameEngine"]').click();
     await page.waitForTimeout(2200);
-    const opts = page.locator('ion-popover ion-item');
-    const on = await opts.count();
-    for (let i = 0; i < on; i++) {
-      const t = (await opts.nth(i).textContent() || '').trim();
-      if (new RegExp('^' + CFG.engine + '$', 'i').test(t)) { await opts.nth(i).click(); break; }
-    }
-    await page.waitForTimeout(2000);
+    const picked = await pickOption(page, CFG.engine);
+    if (!picked) log('WARN: engine option not found: ' + CFG.engine);
+    await dismissPopover(page);
+    await page.waitForTimeout(800);
   }
 
   // 2e. SDK integration
